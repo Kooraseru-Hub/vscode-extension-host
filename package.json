@@ -18,6 +18,46 @@
 	},
 	"activationEvents": ["onStartupFinished"],
 	"categories": ["Other", "Testing"],
+	"contributes": {
+		"configuration": {
+			"title": "Kooraseru Extension Host",
+			"properties": {
+				"vscodeExtensionHost.workspaceSetupScript": {
+					"type": "string",
+					"default": "",
+					"scope": "resource",
+					"restricted": true,
+					"description": "Workspace-relative JavaScript setup script run silently in trusted workspaces."
+				},
+				"vscodeExtensionHost.workspaceSetupWatch": {
+					"type": "array",
+					"items": { "type": "string" },
+					"default": [],
+					"scope": "resource",
+					"restricted": true,
+					"description": "Workspace-relative file patterns that rerun the workspace setup script when changed."
+				},
+				"vscodeExtensionHost.diagnosticsCommand": {
+					"type": "array",
+					"items": { "type": "string" },
+					"default": [],
+					"restricted": true,
+					"description": "Executable and arguments for a workspace diagnostic command using the JSON stdin/stdout protocol."
+				},
+				"vscodeExtensionHost.diagnosticsScript": {
+					"type": "string",
+					"default": "",
+					"description": "Workspace-relative script that prints diagnostics as path:line:column: severity: [source] message. Runs silently on activation and workspace changes."
+				},
+				"vscodeExtensionHost.diagnosticsScriptArgs": {
+					"type": "array",
+					"items": { "type": "string" },
+					"default": [],
+					"description": "Arguments passed to the configured diagnostics script."
+				}
+			}
+		}
+	},
 	"scripts": {
 		"test": "node --test tests/*.test.js",
 		"package:vsix": "node -e \"require('node:fs').mkdirSync('dist', { recursive: true })\" && vsce package --no-dependencies --out dist/vscode-extension-host.vsix"

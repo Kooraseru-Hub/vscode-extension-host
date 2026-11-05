@@ -1,0 +1,40 @@
+name: Publish VS Code Extension
+
+on:
+  workflow_run:
+    workflows: [Extension Host]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install packaging dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build VSIX
+        run: npm run package:vsix
+      - name: Publish latest VSIX
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest dist/vscode-extension-host.vsix --clobber
+          else
+            gh release create latest dist/vscode-extension-host.vsix --target "${{ github.event.workflow_run.head_sha }}" --title 'Kooraseru Extension Host (latest)' --notes 'Latest successful main-branch build.'
+          fi
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath dist/vscode-extension-host.vsix --no-dependencies

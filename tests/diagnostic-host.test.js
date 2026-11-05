@@ -26,8 +26,30 @@ test("runs without a product plugin and publishes initial workspace diagnostics"
 	const diagnostics = [...vscode.collections[0].entries.values()][0];
 	assert.equal(diagnostics[0].message, "Sample finding");
 	assert.equal(diagnostics[0].range.start.line, 1);
+	assert.equal(diagnostics[0].range.end.character, 3);
 	registration.dispose();
 	assert.equal(vscode.collections[0].entries.size, 0);
+	host.dispose();
+});
+
+test("preserves diagnostic spans and exposes provider quick actions", async () => {
+	const [root] = temporaryRoots(1);
+	const vscode = makeVscode([root]);
+	const host = createDiagnosticHost(vscode, undefined, { debounceMs: 1 });
+	let actionInput;
+	host.api.registerDiagnosticProvider({
+		id: "span-and-actions",
+		provideDiagnostics: async () => [{ path: "src/file.cpp", line: 2, column: 2, endLine: 2, endColumn: 8, message: "Span" }],
+		provideCodeActions: (input) => { actionInput = input; return ["quick fix"]; },
+	});
+	await wait();
+	const document = makeDocument(root, "src/file.cpp", "one\nsecond");
+	const actions = vscode.codeActionProviders[0].provider.provideCodeActions(document, undefined, { diagnostics: [] }, undefined);
+	assert.deepEqual(actions, ["quick fix"]);
+	assert.equal(actionInput.workspaceRoot, root);
+	const diagnostic = [...vscode.collections[0].entries.values()][0][0];
+	assert.equal(diagnostic.range.end.line, 1);
+	assert.equal(diagnostic.range.end.character, 7);
 	host.dispose();
 });
 
@@ -54,6 +76,44 @@ test("passes dirty document snapshots and clears corrected diagnostics", async (
 	assert.equal(received, "valid");
 	assert.equal(vscode.collections[0].entries.size, 0);
 	registration.dispose();
+	host.dispose();
+});
+
+test("passes workspace file events with relative paths and reruns all providers by default", async () => {
+	const [root] = temporaryRoots(1);
+	const vscode = makeVscode([root]);
+	const host = createDiagnosticHost(vscode, undefined, { debounceMs: 1 });
+	const seen = [];
+	host.api.registerDiagnosticProvider({ id: "file-events", provideDiagnostics: async ({ changedFile }) => {
+		if (changedFile) seen.push({ path: changedFile.path, kind: changedFile.kind });
+		return [];
+	} });
+	await wait();
+	const uri = vscode.Uri.file(path.join(root, "rules", "languages", "cpp", "check.ts"));
+	vscode.watchers[0].change.fire(uri);
+	await wait();
+	assert.deepEqual(seen, [{ path: "rules/languages/cpp/check.ts", kind: "changed" }]);
+	host.dispose();
+});
+
+test("matchesFile can scope workspace events without suppressing initial diagnostics", async () => {
+	const [root] = temporaryRoots(1);
+	const vscode = makeVscode([root]);
+	const host = createDiagnosticHost(vscode, undefined, { debounceMs: 1 });
+	let calls = 0;
+	host.api.registerDiagnosticProvider({
+		id: "scoped-file-events",
+		matchesFile: (file) => file.path.endsWith(".cpp"),
+		provideDiagnostics: async () => { calls++; return []; },
+	});
+	await wait();
+	assert.equal(calls, 1);
+	vscode.watchers[0].change.fire(vscode.Uri.file(path.join(root, "README.md")));
+	await wait();
+	assert.equal(calls, 1);
+	vscode.watchers[0].change.fire(vscode.Uri.file(path.join(root, "src", "main.cpp")));
+	await wait();
+	assert.equal(calls, 2);
 	host.dispose();
 });
 

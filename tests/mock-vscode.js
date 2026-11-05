@@ -40,6 +40,7 @@ function makeVscode(roots) {
 	};
 	const watchers = [];
 	const collections = [];
+	const codeActionProviders = [];
 	const workspace = {
 		workspaceFolders: roots.map((root, index) => ({ name: "workspace-" + index, index, uri: { scheme: "file", fsPath: root, path: root, toString: () => "file:///" + root.replaceAll("\\", "/") } })),
 		textDocuments: [],
@@ -67,6 +68,7 @@ function makeVscode(roots) {
 		workspace,
 		watchers,
 		collections,
+		codeActionProviders,
 		events,
 		Position,
 		Range,
@@ -74,12 +76,20 @@ function makeVscode(roots) {
 		DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
 		Uri: { file(fsPath) { return { scheme: "file", fsPath, path: fsPath, toString: () => "file:///" + fsPath.replaceAll("\\", "/") }; } },
 		RelativePattern: class RelativePattern { constructor(base, pattern) { this.base = base; this.pattern = pattern; } },
-		languages: { createDiagnosticCollection(name) {
+		languages: {
+			registerCodeActionsProvider(selector, provider, options) {
+			const entry = { selector, provider, options };
+			codeActionProviders.push(entry);
+			return { dispose() { const index = codeActionProviders.indexOf(entry); if (index >= 0) codeActionProviders.splice(index, 1); } };
+		},
+			createDiagnosticCollection(name) {
 			const entries = new Map();
 			const collection = { name, entries, clear() { entries.clear(); }, set(uri, diagnostics) { entries.set(uri.toString(), diagnostics); }, dispose() { this.disposed = true; entries.clear(); } };
 			collections.push(collection);
 			return collection;
-		} },
+			},
+		},
+		CodeActionKind: { QuickFix: "quickfix" },
 	};
 }
 

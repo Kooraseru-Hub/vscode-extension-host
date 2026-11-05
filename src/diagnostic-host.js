@@ -25,13 +25,26 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		return vscode.workspace.workspaceFolders || [];
 	}
 
-	function snapshot(folder, reason, changedDocument) {
+	function snapshotFile(fileEvent, root) {
+		if (!fileEvent?.uri) return undefined;
+		const absolutePath = fileEvent.uri.scheme === "file" ? fileEvent.uri.fsPath : undefined;
+		return Object.freeze({
+			uri: fileEvent.uri,
+			path: absolutePath && withinRoot(root, absolutePath)
+				? path.relative(root, absolutePath).split(path.sep).join("/")
+				: fileEvent.uri.toString(),
+			kind: fileEvent.kind,
+		});
+	}
+
+	function snapshot(folder, reason, changedDocument, changedFile) {
 		const root = folder.uri.fsPath;
 		return {
 			workspaceFolder: folder,
 			workspaceRoot: root,
 			reason,
 			changedDocument: changedDocument ? snapshotDocument(changedDocument, root) : undefined,
+			changedFile: snapshotFile(changedFile, root),
 			documents: vscode.workspace.textDocuments
 				.filter((document) => {
 					const documentFolder = vscode.workspace.getWorkspaceFolder(document.uri);
@@ -74,7 +87,12 @@ function createDiagnosticHost(vscode, context, options = {}) {
 			information: vscode.DiagnosticSeverity.Information,
 			hint: vscode.DiagnosticSeverity.Hint,
 		}[finding.severity] ?? vscode.DiagnosticSeverity.Error;
-		const diagnostic = new vscode.Diagnostic(new vscode.Range(start, start.translate(0, 1)), finding.message, severity);
+		const endLine = Number.isInteger(finding.endLine) && finding.endLine > 0 ? finding.endLine - 1 : line;
+		const endColumn = Number.isInteger(finding.endColumn) && finding.endColumn > 0
+			? finding.endColumn - 1
+			: column + 1;
+		const end = new vscode.Position(endLine, Math.max(column + 1, endColumn));
+		const diagnostic = new vscode.Diagnostic(new vscode.Range(start, end), finding.message, severity);
 		diagnostic.code = finding.code == null ? undefined : String(finding.code);
 		diagnostic.source = String(finding.source || providerId);
 		return { uri, diagnostic };
@@ -104,7 +122,7 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		for (const entry of grouped.values()) state.collection.set(entry.uri, entry.diagnostics);
 	}
 
-	async function run(state, reason, changedDocument, callerOptions) {
+	async function run(state, reason, changedDocument, callerOptions, changedFile) {
 		if (state.disposed) return undefined;
 		const generation = ++state.generation;
 		state.controller?.abort();
@@ -112,7 +130,7 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		state.controller = controller;
 		try {
 			const result = await state.provider.provideDiagnostics({
-				...snapshot(state.folder, reason, changedDocument),
+				...snapshot(state.folder, reason, changedDocument, changedFile),
 				signal: controller.signal,
 				options: callerOptions || {},
 			});
@@ -155,7 +173,7 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		return state;
 	}
 
-	function schedule(state, reason, changedDocument) {
+	function schedule(state, reason, changedDocument, changedFile) {
 		clearTimeout(state.timer);
 		timers.delete(state.timer);
 		state.controller?.abort();
@@ -164,20 +182,22 @@ function createDiagnosticHost(vscode, context, options = {}) {
 			timers.delete(timer);
 			state.timer = undefined;
 			if (state.disposed || generation !== state.generation) return;
-			void run(state, reason, changedDocument);
+			void run(state, reason, changedDocument, undefined, changedFile);
 		}, debounceMs);
 		state.timer = timer;
 		timers.add(timer);
 	}
 
-	function scheduleAll(reason, changedDocument, folder) {
+	function scheduleAll(reason, changedDocument, folder, changedFile) {
 		let target = folder;
 		if (!target && changedDocument) target = vscode.workspace.getWorkspaceFolder(changedDocument.uri);
 		for (const record of providers.values()) {
 			for (const candidate of target ? [target] : folders()) {
 				const state = stateFor(record, candidate);
 				if (record.provider.matchesDocument && changedDocument && !record.provider.matchesDocument(changedDocument)) continue;
-				schedule(state, reason, changedDocument);
+				const fileSnapshot = changedFile && snapshotFile(changedFile, candidate.uri.fsPath);
+				if (record.provider.matchesFile && fileSnapshot && !record.provider.matchesFile(fileSnapshot, candidate)) continue;
+				schedule(state, reason, changedDocument, changedFile);
 			}
 		}
 	}
@@ -188,10 +208,10 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		if (watchers.has(root)) return;
 		const pattern = new vscode.RelativePattern(folder, "**/*");
 		const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-		const trigger = () => scheduleAll("workspace-file-change", undefined, folder);
-		watcher.onDidCreate(trigger, undefined, subscriptions);
-		watcher.onDidChange(trigger, undefined, subscriptions);
-		watcher.onDidDelete(trigger, undefined, subscriptions);
+		const trigger = (uri, kind) => scheduleAll("workspace-file-change", undefined, folder, { uri, kind });
+		watcher.onDidCreate((uri) => trigger(uri, "created"), undefined, subscriptions);
+		watcher.onDidChange((uri) => trigger(uri, "changed"), undefined, subscriptions);
+		watcher.onDidDelete((uri) => trigger(uri, "deleted"), undefined, subscriptions);
 		subscriptions.push(watcher);
 		watchers.set(root, watcher);
 	}
@@ -203,6 +223,19 @@ function createDiagnosticHost(vscode, context, options = {}) {
 		if (providers.has(provider.id)) throw new Error("Diagnostic provider already registered: " + provider.id);
 		const record = { provider, workspaces: new Map(), disposed: false };
 		providers.set(provider.id, record);
+		if (typeof provider.provideCodeActions === "function" && typeof vscode.languages.registerCodeActionsProvider === "function") {
+			const actionProvider = {
+				provideCodeActions(document, range, context, token) {
+					const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+					if (!folder) return undefined;
+					return provider.provideCodeActions({ document, range, context, token, workspaceFolder: folder, workspaceRoot: folder.uri.fsPath });
+				},
+			};
+			const registration = vscode.languages.registerCodeActionsProvider({ scheme: "file" }, actionProvider, {
+				providedCodeActionKinds: [vscode.CodeActionKind?.QuickFix].filter(Boolean),
+			});
+			subscriptions.push(registration);
+		}
 		for (const folder of folders()) schedule(stateFor(record, folder), "initial");
 		return Object.freeze({
 			refresh: (folderOrUri, callerOptions = {}) => {
