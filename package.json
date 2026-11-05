@@ -11,13 +11,20 @@
 		"url": "https://github.com/Kooraseru-Hub/vscode-extension-host.git"
 	},
 	"main": "./src/extension.js",
-	"extensionKind": ["workspace"],
+	"extensionKind": [
+		"workspace"
+	],
 	"engines": {
 		"node": ">=20",
 		"vscode": "^1.90.0"
 	},
-	"activationEvents": ["onStartupFinished"],
-	"categories": ["Other", "Testing"],
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"categories": [
+		"Other",
+		"Testing"
+	],
 	"scripts": {
 		"test": "node --test tests/*.test.js",
 		"package:vsix": "node -e \"require('node:fs').mkdirSync('dist', { recursive: true })\" && vsce package --no-dependencies --out dist/vscode-extension-host.vsix"
@@ -27,5 +34,29 @@
 	},
 	"exports": {
 		".": "./src/diagnostic-host.js"
+	},
+	"contributes": {
+		"configuration": {
+			"title": "Kooraseru Extension Host",
+			"properties": {
+				"vscodeExtensionHost.workspaceSetupScript": {
+					"type": "string",
+					"default": "",
+					"scope": "resource",
+					"restricted": true,
+					"description": "Workspace-relative JavaScript setup script run silently in trusted workspaces."
+				},
+				"vscodeExtensionHost.workspaceSetupWatch": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"scope": "resource",
+					"restricted": true,
+					"description": "Workspace-relative file patterns that rerun the workspace setup script when changed."
+				}
+			}
+		}
 	}
 }
