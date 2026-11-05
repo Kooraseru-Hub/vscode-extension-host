@@ -1,0 +1,31 @@
+{
+	"name": "vscode-extension-host",
+	"displayName": "Kooraseru Extension Host",
+	"description": "A language-neutral VS Code host API for workspace plugins and live diagnostics.",
+	"icon": "images/icon.png",
+	"version": "0.1.0",
+	"publisher": "kooraseru-hub",
+	"license": "ISC",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Kooraseru-Hub/vscode-extension-host.git"
+	},
+	"main": "./src/extension.js",
+	"extensionKind": ["workspace"],
+	"engines": {
+		"node": ">=20",
+		"vscode": "^1.90.0"
+	},
+	"activationEvents": ["onStartupFinished"],
+	"categories": ["Other", "Testing"],
+	"scripts": {
+		"test": "node --test tests/*.test.js",
+		"package:vsix": "node -e \"require('node:fs').mkdirSync('dist', { recursive: true })\" && vsce package --no-dependencies --out dist/vscode-extension-host.vsix"
+	},
+	"devDependencies": {
+		"@vscode/vsce": "^3.7.1"
+	},
+	"exports": {
+		".": "./src/diagnostic-host.js"
+	}
+}
