@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,6 +35,4 @@ jobs:
             gh release create latest dist/vscode-extension-host.vsix --target "${{ github.event.workflow_run.head_sha }}" --title 'Kooraseru Extension Host (latest)' --notes 'Latest successful main-branch build.'
           fi
       - name: Publish to Visual Studio Marketplace
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce publish --packagePath dist/vscode-extension-host.vsix --no-dependencies
+        run: npx vsce publish --oidc --packagePath dist/vscode-extension-host.vsix --no-dependencies
