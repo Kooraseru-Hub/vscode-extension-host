@@ -29,3 +29,7 @@ Providers receive `{ workspaceFolder, workspaceRoot, documents, changedDocument,
 Relative diagnostic paths are resolved against the workspace root. Findings that escape the workspace are ignored. Provider exceptions become a `provider-failed` diagnostic. Each result atomically replaces the provider's prior diagnostics for that workspace; disposing the registration clears them. Providers should honor the supplied `AbortSignal`; the host also discards stale results from providers that do not.
 
 The host debounces ordinary editor events. Manual refresh bypasses the debounce and passes caller options to the provider. The host never applies edits or fixes.
+
+## Workspace setup
+
+Trusted workspaces may configure `vscodeExtensionHost.workspaceSetupScript` as a workspace-relative JavaScript file and `vscodeExtensionHost.workspaceSetupWatch` as relative watch patterns. The host runs the script silently on activation and after watched changes, using VS Code's Node runtime. Output and errors appear in the Kooraseru Workspace Setup output channel. Runs for one workspace do not overlap.

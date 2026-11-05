@@ -12,6 +12,6 @@ test("activates the generic host without loading a product plugin", () => {
 	assert.equal(api.apiVersion, 1);
 	assert.deepEqual(api.getWorkspaceFolders(), []);
 	assert.equal(typeof api.registerDiagnosticProvider, "function");
-	assert.equal(context.subscriptions.length, 1);
-	context.subscriptions[0].dispose();
+	assert.equal(context.subscriptions.length, 2);
+	for (const subscription of context.subscriptions) subscription.dispose();
 });
