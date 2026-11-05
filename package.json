@@ -4,7 +4,7 @@
 	"description": "A language-neutral VS Code host API for workspace plugins and live diagnostics.",
 	"icon": "images/icon.png",
 	"version": "0.1.0",
-	"publisher": "kooraseru-hub",
+	"publisher": "Kooraseru",
 	"license": "ISC",
 	"repository": {
 		"type": "git",
