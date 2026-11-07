@@ -1,4 +1,4 @@
-name: Extension Host
+name: Workbench Bridge
 
 on:
   push:
@@ -18,14 +18,30 @@ jobs:
         with:
           node-version: '24'
       - name: Install packaging dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run tests
         run: npm test
+      - name: Install native test runtimes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/bridge-python"
+          "$RUNNER_TEMP/bridge-python/bin/python" -m pip install -r examples/requirements.txt
+          echo "BRIDGE_TEST_PYTHON=$RUNNER_TEMP/bridge-python/bin/python" >> "$GITHUB_ENV"
+          gh release download v1.0.1-nightly.20261104 --repo luau-lang/lute --pattern lute-linux-x86_64.zip --dir "$RUNNER_TEMP/bridge-lute"
+          echo "adfc6547080f79b9a0e9b88458564b197f82931ad0484f372cb7ad20f679e846  $RUNNER_TEMP/bridge-lute/lute-linux-x86_64.zip" | sha256sum --check
+          unzip "$RUNNER_TEMP/bridge-lute/lute-linux-x86_64.zip" -d "$RUNNER_TEMP/bridge-lute/extracted"
+          lute_executable=$(find "$RUNNER_TEMP/bridge-lute/extracted" -type f -name lute -print -quit)
+          test -n "$lute_executable"
+          chmod +x "$lute_executable"
+          echo "BRIDGE_TEST_LUTE=$lute_executable" >> "$GITHUB_ENV"
+      - name: Run native VS Code contract tests
+        run: xvfb-run -a npm run test:vscode
       - name: Build VSIX
         run: npm run package:vsix
       - uses: actions/upload-artifact@v7
         with:
-          name: vscode-extension-host-vsix
-          path: dist/vscode-extension-host.vsix
+          name: workbench-bridge-vsix
+          path: dist/workbench-bridge.vsix
           if-no-files-found: error
 

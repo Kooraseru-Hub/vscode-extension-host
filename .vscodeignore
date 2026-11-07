@@ -1,6 +1,0 @@
-.github/**
-docs/**
-tests/**
-dist/**
-node_modules/**
-*.vsix

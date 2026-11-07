@@ -1,14 +1,14 @@
 {
-	"name": "vscode-extension-host",
-	"displayName": "Kooraseru Extension Host",
-	"description": "A language-neutral VS Code host API for workspace plugins and live diagnostics.",
+	"name": "workbench-bridge",
+	"displayName": "Workbench Bridge",
+	"description": "Expose VS Code APIs to external workspace programs through a stable, language-neutral bridge.",
 	"icon": "images/icon.png",
-	"version": "0.1.0",
-	"publisher": "kooraseru-hub",
+	"version": "0.2.0",
+	"publisher": "Kooraseru",
 	"license": "ISC",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Kooraseru-Hub/vscode-extension-host.git"
+		"url": "https://github.com/Kooraseru-Hub/workbench-bridge.git"
 	},
 	"main": "./src/extension.js",
 	"extensionKind": [
@@ -22,41 +22,71 @@
 		"onStartupFinished"
 	],
 	"categories": [
-		"Other",
-		"Testing"
+		"Other"
 	],
 	"contributes": {
 		"configuration": {
-			"title": "Kooraseru Extension Host",
+			"title": "Workbench Bridge",
 			"properties": {
-				"vscodeExtensionHost.workspaceSetupScript": {
-					"type": "string",
-					"default": "",
+				"workbenchBridge.enabled": {
+					"type": "boolean",
+					"default": true,
 					"scope": "resource",
-					"restricted": true,
-					"description": "Workspace-relative JavaScript setup script run silently in trusted workspaces."
+					"description": "Enable Workbench Bridge for trusted workspaces."
 				},
-				"vscodeExtensionHost.workspaceSetupWatch": {
+				"workbenchBridge.workspaceCommands": {
 					"type": "array",
-					"items": {
-						"type": "string"
-					},
 					"default": [],
 					"scope": "resource",
 					"restricted": true,
-					"description": "Workspace-relative file patterns that rerun the workspace setup script when changed."
+					"items": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "string"
+						}
+					},
+					"description": "External executable/argument arrays to start after the bridge is ready. Processes receive WORKBENCH_BRIDGE_SESSION and stop with the workspace."
+				},
+				"workbenchBridge.maxMessageBytes": {
+					"type": "integer",
+					"default": 67108864,
+					"minimum": 1024,
+					"maximum": 1073741824,
+					"scope": "resource",
+					"description": "Maximum WebSocket message size in bytes."
 				}
 			}
-		}
+		},
+		"commands": [
+			{
+				"command": "workbenchBridge.showOutput",
+				"title": "Show Output",
+				"category": "Workbench Bridge"
+			},
+			{
+				"command": "workbenchBridge.restart",
+				"title": "Restart Workspace Connections",
+				"category": "Workbench Bridge"
+			}
+		]
 	},
 	"scripts": {
 		"test": "node --test tests/*.test.js",
-		"package:vsix": "node -e \"require('node:fs').mkdirSync('dist', { recursive: true })\" && vsce package --no-dependencies --out dist/vscode-extension-host.vsix"
+		"package:vsix": "node -e \"require('node:fs').mkdirSync('dist', { recursive: true })\" && vsce package --out dist/workbench-bridge.vsix",
+		"test:vscode": "node tests/run-vscode.cjs"
 	},
 	"devDependencies": {
+		"@vscode/test-electron": "^3.1.0",
 		"@vscode/vsce": "^4.1.0"
 	},
+	"dependencies": {
+		"ws": "^8.22.1"
+	},
 	"exports": {
-		".": "./src/diagnostic-host.js"
+		"./client": {
+			"types": "./client/index.d.ts",
+			"default": "./client/index.js"
+		}
 	}
 }

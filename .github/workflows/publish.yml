@@ -2,7 +2,7 @@ name: Publish VS Code Extension
 
 on:
   workflow_run:
-    workflows: [Extension Host]
+    workflows: [Workbench Bridge]
     types: [completed]
     branches: [main]
 
@@ -30,9 +30,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           if gh release view latest >/dev/null 2>&1; then
-            gh release upload latest dist/vscode-extension-host.vsix --clobber
+            gh release upload latest dist/workbench-bridge.vsix --clobber
           else
-            gh release create latest dist/vscode-extension-host.vsix --target "${{ github.event.workflow_run.head_sha }}" --title 'Kooraseru Extension Host (latest)' --notes 'Latest successful main-branch build.'
+            gh release create latest dist/workbench-bridge.vsix --target "${{ github.event.workflow_run.head_sha }}" --title 'Workbench Bridge (latest)' --notes 'Latest successful main-branch build.'
           fi
       - name: Publish to Visual Studio Marketplace
-        run: npx vsce publish --oidc --packagePath dist/vscode-extension-host.vsix --no-dependencies
+        run: npx vsce publish --oidc --packagePath dist/workbench-bridge.vsix
