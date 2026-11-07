@@ -14,6 +14,9 @@ const executable = process.env.VSCODE_EXECUTABLE || (installed && fs.existsSync(
 const args = [workspace, "--new-window", "--skip-welcome", "--skip-release-notes", "--disable-workspace-trust", "--disable-extensions",
  "--user-data-dir=" + path.join(testRoot, "profile"), "--extensions-dir=" + path.join(testRoot, "extensions"),
  "--extensionDevelopmentPath=" + root, "--extensionTestsPath=" + path.join(root, "tests/vscode/runner.cjs")];
+// Match vscode-test's launch flags on isolated Linux CI runners, where the
+// downloaded Electron sandbox helper is not installed as a root-owned setuid binary.
+if (process.platform === "linux" && process.env.CI === "true") args.push("--no-sandbox", "--disable-gpu-sandbox");
 const child = spawn(executable, args, { env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined, BRIDGE_TEST_RESULT: result }, windowsHide: true, stdio: "inherit" });
 const timeout = setTimeout(() => { child.kill(); console.error("VS Code integration timeout; artifacts: " + testRoot); process.exitCode = 1; }, 180000);
 child.on("error", error => { clearTimeout(timeout); console.error(error); process.exitCode = 1; });
